@@ -6,6 +6,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import firestore from "firestore";
 import { Button, Card, Spinner, Navbar } from 'react-bootstrap';
 import NavbarComponent from './NavbarComponent';
+import PushupCounter from './PushupCounter';
 // Configure Firebase.
 const config = {
     apiKey: "AIzaSyD8G9JmSEDqQT8Ae64g3BpuToRk4YYY_mo",
@@ -18,7 +19,7 @@ const config = {
     measurementId: "G-K929YMYWRR"
     // ...
 };
-firebase.initializeApp(config);
+const firebaseApp = firebase.initializeApp(config);
 const db = firebase.firestore();
 db.settings({
     timestampsInSnapshots: true
@@ -38,74 +39,82 @@ const uiConfig = {
 class App extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {
-            count: 0,
-        };
 
+        this.state = {
+            isSignedIn: undefined,
+        };
+    }
+
+    componentDidMount() {
         // This binding is necessary to make `this` work in the callback
         //firebase.auth().signOut()
-        firebase.auth().onAuthStateChanged(function(user) {
+        // firebase.auth().onAuthStateChanged(function(user) {
+        //     
+        // });
+
+        this.unregisterAuthObserver = firebaseApp.auth().onAuthStateChanged((user) => {
+            this.setState({isSignedIn: !!user});
+
             if (user) {
                 // User is signed in.
                 console.log("Succesfully signed in");
-               // console.log(user);
+                // console.log(user);
                 const userRef = db.collection("users").doc(user.uid).set({
                     displayName: user.displayName,
                     photoURL: user.photoURL,
                     email: user.email
-                })
-                    .then(function() {
-                        console.log("Succesfully updated user");
-                    })
-                    .catch(function(error) {
-                        console.error("Error writing user data: ", error);
-                    });
-
+                }).then(function() {
+                    console.log("Succesfully updated user", user);
+                }).catch(function(error) {
+                    console.error("Error writing user data: ", error);
+                });
             } else {
                 // No user is signed in.
                 console.log("not signed in");
             }
         });
-
-        
-        this.countPushup = this.countPushup.bind(this);
     }
-    countPushup() {
-        this.setState((state) => {
-            // Important: read `state` instead of `this.state` when updating.
-            return {count: state.count + 1}
 
-
-        });
-        console.log("+1");
-        console.log(this.state.count);
-        navigator.vibrate(1000);
-
-        // for this uid>unique session>update count
+    componentWillUnmount() {
+        this.unregisterAuthObserver();
     }
+
+    // render() {
+    //     console.log("user", currentUser);
+    //
+    //     return (
+    //         <div >
+    //
+    //             <h1>My App</h1>
+    //             <p>Please sign-in:</p>
+    //             <StyledFirebaseAuth uiConfig={uiConfig} firebaseAuth={firebase.auth()}/>
+    //         </div>
+    //     );
+    // }
+
     render() {
+        const signedIn = this.state.isSignedIn;
+        var user = null;
+        if (signedIn) {
+            user = firebaseApp.auth().currentUser;
+        }
+
         return (
             <div >
-                <NavbarComponent />
-
-                <h1>My App</h1>
-                <p>Please sign-in:</p>
-                <StyledFirebaseAuth uiConfig={uiConfig} firebaseAuth={firebase.auth()}/>
-                <h1>{this.state.count}</h1>
-                <Button variant="primary" size="lg" onClick={this.countPushup}>
-                    Nose Here
-                </Button>
-                
-                <Card onClick={this.countPushup}>
-                    <Card.Header as="h5">Featured</Card.Header>
-                    <Card.Body>
-                        <Card.Title>Special title treatment</Card.Title>
-                        <Card.Text>
-                            With supporting text below as a natural lead-in to additional content.
-                        </Card.Text>
-                        
-                    </Card.Body>
-                </Card>
+                {
+                    (!signedIn || !user)
+                    ?
+                        (<div>
+                            <StyledFirebaseAuth uiConfig={uiConfig} firebaseAuth={firebase.auth()}/>
+                        </div>)
+                    :
+                        (<div >
+                            <NavbarComponent userPhoto={user.photoURL}/>
+                            <PushupCounter />
+                            Hello {user.displayName}. You are now signed In!
+                            <a onClick={() => firebaseApp.auth().signOut()}>Sign-out</a>
+                        </div>)
+                }
             </div>
         );
     }
